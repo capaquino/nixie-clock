@@ -109,7 +109,7 @@ void shift_byte_lsb(uint8_t data)
 /// Nixie - requires Shift Register
 //////////////////////////////////////////////////////////////////////////
 
-#define NUMBER_OF_TUBES 2
+#define NUMBER_OF_TUBES 5
 #define OFF 0xF
 #define ONES_TUBE 2
 #define TENS_TUBE 1
@@ -169,6 +169,30 @@ void scroll(unsigned int numberOfTubes)
 	}
 }
 
+// turns off the display without modifiying nixie tube data in array
+void turn_off_display(unsigned int numberOfTubes)
+{
+	uint8_t clearBytes[NUMBER_OF_TUBES];
+	
+	for (uint8_t i=0; i<numberOfTubes; i++)
+	{
+		clearBytes[i] = OFF;
+	}
+	
+	display(clearBytes, numberOfTubes);
+}
+
+// overwrites the actual tube data in array with with OFF
+void clear_tubes(uint8_t bytes[], unsigned int numberOfTubes)
+{
+	for (uint8_t i=0; i<numberOfTubes; i++)
+	{
+		bytes[i] = OFF;
+	}
+	
+	display(bytes, numberOfTubes);
+}
+
 //////////////////////////////////////////////////////////////////////////
 /// I2C
 //////////////////////////////////////////////////////////////////////////
@@ -204,6 +228,34 @@ ISR(PCINT0_vect)
 	
 	/*PCIFR = 0x01; Clear interrupt flag. Automatically done.*/
 }
+
+//////////////////////////////////////////////////////////////////////////
+/// IN15A Symbol Map
+//////////////////////////////////////////////////////////////////////////
+
+#define IN15A_n			1
+#define IN15A_percent	2
+#define IN15A_pi_upper	3
+#define IN15A_k			4
+#define IN15A_M			5
+#define IN15A_m			6
+#define IN15A_plus		7
+#define IN15A_minus		8
+#define IN15A_P			9
+#define IN15A_u			0
+
+//////////////////////////////////////////////////////////////////////////
+/// IN15B Symbol Map
+//////////////////////////////////////////////////////////////////////////
+
+#define IN15B_A			1
+#define IN15B_ohm		2
+#define IN15B_S			4
+#define IN15B_V			5
+#define IN15B_H			6
+#define IN15B_hz		7
+#define IN15B_F			9
+#define IN15B_W			0
 
 //////////////////////////////////////////////////////////////////////////
 /// Main
@@ -247,9 +299,9 @@ int main(void)
 		if (nixieOutputOn == true)
 		{
 			// Get clock data
-			rtc_data_sec = rtc_read(DS3231_SECONDS_REG_OFFSET);
-			rtc_data_min = rtc_read(DS3231_MINUTES_REG_OFFSET);
-			rtc_data_hour = rtc_read(DS3231_HOURS_REG_OFFSET);
+			//*rtc_data_sec = rtc_read(DS3231_SECONDS_REG_OFFSET);
+			//*rtc_data_min = rtc_read(DS3231_MINUTES_REG_OFFSET);
+			//*rtc_data_hour = rtc_read(DS3231_HOURS_REG_OFFSET);
 		
 			// Organize into nixie tube data.
 		
@@ -260,22 +312,124 @@ int main(void)
 		
 		
 			// Seconds
-			set_tube_digit(nixie, toSeconds(rtc_data_sec)%10, ONES_TUBE);
-			set_tube_digit(nixie, toSeconds(rtc_data_sec)/10, TENS_TUBE);
+			//*set_tube_digit(nixie, toSeconds(rtc_data_sec)%10, ONES_TUBE);
+			//*set_tube_digit(nixie, toSeconds(rtc_data_sec)/10, TENS_TUBE);
 		
 			// Display
-			display(nixie, NUMBER_OF_TUBES);
+			//*display(nixie, NUMBER_OF_TUBES);
 		
 			// scroll effect, delaying is very bad when interrutpts are enabled.
 			//_delay_ms(800);
 			//scroll(NUMBER_OF_TUBES);
+			
+			// International Women's Day Post
+			// Symbol:		W 0  M/m A/F n/pi_upper
+			// Tube Type:	B 12 A   B   A
+			// Tube Digit:	1 2  3   4   5
+			
+			set_tube_digit(nixie, IN15B_W, 1);
+			set_tube_digit(nixie, 0, 2);
+			set_tube_digit(nixie, IN15A_m, 3);
+			set_tube_digit(nixie, IN15B_A, 4);
+			set_tube_digit(nixie, IN15A_pi_upper, 5);
+			display(nixie, NUMBER_OF_TUBES);
+			
+			// things learned:
+			// 1: _delay requires a compile time constant... hence the massive text below
+			// 2: _delay affects messy nixie tube circuits.
+			
+			
+			// ...
+			// to blink tubes uncomment the following
+			//_delay_ms(2000);
+			//turn_off_display(NUMBER_OF_TUBES);
+			//_delay_ms(2000);
+			//
+			//
+			//// down
+			//display(nixie, NUMBER_OF_TUBES);
+			//_delay_ms(1600);
+			//turn_off_display(NUMBER_OF_TUBES);
+			//_delay_ms(1600);
+					//display(nixie, NUMBER_OF_TUBES);
+					//_delay_ms(1200);
+					//turn_off_display(NUMBER_OF_TUBES);
+					//_delay_ms(1200);
+							//display(nixie, NUMBER_OF_TUBES);
+							//_delay_ms(800);
+							//turn_off_display(NUMBER_OF_TUBES);
+							//_delay_ms(800);
+									//display(nixie, NUMBER_OF_TUBES);
+									//_delay_ms(600);
+									//turn_off_display(NUMBER_OF_TUBES);
+									//_delay_ms(600);
+											//display(nixie, NUMBER_OF_TUBES);
+											//_delay_ms(400);
+											//turn_off_display(NUMBER_OF_TUBES);
+											//_delay_ms(400);
+													//display(nixie, NUMBER_OF_TUBES);
+													//_delay_ms(300);
+													//turn_off_display(NUMBER_OF_TUBES);
+													//_delay_ms(300);
+															//display(nixie, NUMBER_OF_TUBES);
+															//_delay_ms(200);
+															//turn_off_display(NUMBER_OF_TUBES);
+															//_delay_ms(200);
+																	//display(nixie, NUMBER_OF_TUBES);
+																	//_delay_ms(100);
+																	//turn_off_display(NUMBER_OF_TUBES);
+																	//_delay_ms(100);
+			////up
+			//display(nixie, NUMBER_OF_TUBES);
+			//_delay_ms(100);
+			//turn_off_display(NUMBER_OF_TUBES);
+			//_delay_ms(100);
+					//display(nixie, NUMBER_OF_TUBES);
+					//_delay_ms(200);
+					//turn_off_display(NUMBER_OF_TUBES);
+					//_delay_ms(200);
+							//display(nixie, NUMBER_OF_TUBES);
+							//_delay_ms(300);
+							//turn_off_display( NUMBER_OF_TUBES);
+							//_delay_ms(300);
+									//display(nixie, NUMBER_OF_TUBES);
+									//_delay_ms(400);
+									//turn_off_display(NUMBER_OF_TUBES);
+									//_delay_ms(400);
+											//display(nixie, NUMBER_OF_TUBES);
+											//_delay_ms(600);
+											//turn_off_display(NUMBER_OF_TUBES);
+											//_delay_ms(600);
+													//display(nixie, NUMBER_OF_TUBES);
+													//_delay_ms(800);
+													//turn_off_display(NUMBER_OF_TUBES);
+													//_delay_ms(800);
+															//display(nixie, NUMBER_OF_TUBES);
+															//_delay_ms(1200);
+															//turn_off_display(NUMBER_OF_TUBES);
+															//_delay_ms(1200);
+																	//display(nixie, NUMBER_OF_TUBES);
+																	//_delay_ms(1600);
+																	//turn_off_display(NUMBER_OF_TUBES);
+																	//_delay_ms(1600);
+			
 		}
 		else
 		{
-			set_tube_digit(nixie, OFF, ONES_TUBE);
-			set_tube_digit(nixie, OFF, TENS_TUBE);
-			display(nixie, NUMBER_OF_TUBES);
+			turn_off_display(NUMBER_OF_TUBES);
 		}
 	}
 }
 
+			//for (int tube = 0; tube<NUMBER_OF_TUBES;tube++)
+			//{
+			//switch (tube)
+			//{
+			//case 0:	set_tube_digit(nixie, IN15B_W,			1); break;
+			//case 1:	set_tube_digit(nixie, 0,				2); break;
+			//case 2:	set_tube_digit(nixie, IN15A_m,			3); break;
+			//case 3:	set_tube_digit(nixie, IN15B_A,			4); break;
+			//case 4:	set_tube_digit(nixie, IN15A_pi_upper,	5); break;
+			//}
+			//display(nixie, NUMBER_OF_TUBES);
+			//
