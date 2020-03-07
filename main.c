@@ -177,14 +177,45 @@ void scroll(unsigned int numberOfTubes)
 #include "rtc.h"
 
 //////////////////////////////////////////////////////////////////////////
+/// Interrupts
+//////////////////////////////////////////////////////////////////////////
+
+#include <avr/interrupt.h>
+
+volatile bool nixieOutputOn = false; // volatile is NECESSARY
+
+ISR(PCINT0_vect)
+{
+	if (PINB & 1<<PINB0) // rising edge, do nothing
+	{
+
+	}
+	else // falling edge
+	{
+		if (nixieOutputOn == true)
+		{
+			nixieOutputOn = false;
+		}
+		else
+		{
+			nixieOutputOn = true;
+		}
+	}
+	
+	/*PCIFR = 0x01; Clear interrupt flag. Automatically done.*/
+}
+
+//////////////////////////////////////////////////////////////////////////
 /// Main
 //////////////////////////////////////////////////////////////////////////
 
 
 int main(void)
 {
-	// Init Attiny85
+	// Init Shift register
 	HC595_DDR = 1<<HC595_DATA | 1<<HC595_CLOCK | 1<<HC595_LATCH;
+	
+	// Init I2C
 	i2c_init();
 	
 	// Init DS3231
@@ -202,33 +233,49 @@ int main(void)
 	set_tube_digit(nixie, OFF, 2);
 	display(nixie, NUMBER_OF_TUBES);
 	
+	// init interrupts
+	DDRB &= ~(1<<PORTB0); // Set as input
+	PORTB |= 1<<PORTB0; // Set internal pullup.
+	PCICR |= 1<<PCIE0;// Enable interrupt 0 (interrupt for pins that have PCINT0-7)
+	PCMSK0 |= 1<<PCINT0; // Set which pins from PCINT0-7 cause interrupt. In this case, set PB0.
+	
+	PCIFR = 0x01; // clear old/stray interrupts for PCINT0
+	sei(); // enable interrupts
+	
 	while (1)
 	{
-		// Get clock data
-		rtc_data_sec = rtc_read(DS3231_SECONDS_REG_OFFSET);
-		rtc_data_min = rtc_read(DS3231_MINUTES_REG_OFFSET);
-		rtc_data_hour = rtc_read(DS3231_HOURS_REG_OFFSET);
+		if (nixieOutputOn == true)
+		{
+			// Get clock data
+			rtc_data_sec = rtc_read(DS3231_SECONDS_REG_OFFSET);
+			rtc_data_min = rtc_read(DS3231_MINUTES_REG_OFFSET);
+			rtc_data_hour = rtc_read(DS3231_HOURS_REG_OFFSET);
 		
-		// Organize into nixie tube data.
+			// Organize into nixie tube data.
 		
-		// Hours
-		
-		
-		// Minutes
-		
-		
-		// Seconds
-		set_tube_digit(nixie, toSeconds(rtc_data_sec)%10, ONES_TUBE);
-		set_tube_digit(nixie, toSeconds(rtc_data_sec)/10, TENS_TUBE);
-		
-		// Display
-		display(nixie, NUMBER_OF_TUBES);
-		
-		_delay_ms(800);
+			// Hours
 		
 		
-		scroll(NUMBER_OF_TUBES);
+			// Minutes
 		
+		
+			// Seconds
+			set_tube_digit(nixie, toSeconds(rtc_data_sec)%10, ONES_TUBE);
+			set_tube_digit(nixie, toSeconds(rtc_data_sec)/10, TENS_TUBE);
+		
+			// Display
+			display(nixie, NUMBER_OF_TUBES);
+		
+			// scroll effect, delaying is very bad when interrutpts are enabled.
+			//_delay_ms(800);
+			//scroll(NUMBER_OF_TUBES);
+		}
+		else
+		{
+			set_tube_digit(nixie, OFF, ONES_TUBE);
+			set_tube_digit(nixie, OFF, TENS_TUBE);
+			display(nixie, NUMBER_OF_TUBES);
+		}
 	}
 }
 
