@@ -109,10 +109,8 @@ void shift_byte_lsb(uint8_t data)
 /// Nixie - requires Shift Register
 //////////////////////////////////////////////////////////////////////////
 
-#define NUMBER_OF_TUBES 5
+#define NUMBER_OF_TUBES 4
 #define OFF 0xF
-#define ONES_TUBE 2
-#define TENS_TUBE 1
 
 void set_tube_digit(uint8_t bytes[], uint8_t digit, unsigned int tube)
 {
@@ -261,6 +259,14 @@ ISR(PCINT0_vect)
 /// Main
 //////////////////////////////////////////////////////////////////////////
 
+// This needs to change depending on the number of tubes
+
+#define ONES_TUBE		4		// 2 with two tubes	// 4 with four tubes // 6 with 6 tubes
+#define TENS_TUBE		3		// 1 with two tubes // 3 with four tubes // 5 with 6 tubes
+#define HUNDREDS_TUBE	2							// 2 with four tubes // 4 with 6 tubes
+#define THOUSANDS_TUBE	1							// 1 with four tubes // 3 with 6 tubes
+
+
 
 int main(void)
 {
@@ -273,16 +279,15 @@ int main(void)
 	// Init DS3231
 	rtc_write(DS3231_CONTROL_REG_OFFSET,0x00);
 	rtc_write(DS3231_HOURS_REG_OFFSET,toRegisterValue(10)); // this may or may not be 12
-	rtc_write(DS3231_MINUTES_REG_OFFSET,toRegisterValue(29));
-	rtc_write(DS3231_SECONDS_REG_OFFSET,toRegisterValue(50));
+	rtc_write(DS3231_MINUTES_REG_OFFSET,toRegisterValue(59));
+	rtc_write(DS3231_SECONDS_REG_OFFSET,toRegisterValue(45));
 	uint8_t rtc_data_sec = 0;
 	uint8_t rtc_data_min = 0;
 	uint8_t rtc_data_hour = 0;
 	
 	// Init nixie tube
 	uint8_t nixie[NUMBER_OF_TUBES];
-	set_tube_digit(nixie, OFF, 1);
-	set_tube_digit(nixie, OFF, 2);
+	clear_tubes(nixie, NUMBER_OF_TUBES);
 	display(nixie, NUMBER_OF_TUBES);
 	
 	// init interrupts
@@ -299,9 +304,9 @@ int main(void)
 		if (nixieOutputOn == true)
 		{
 			// Get clock data
-			//*rtc_data_sec = rtc_read(DS3231_SECONDS_REG_OFFSET);
-			//*rtc_data_min = rtc_read(DS3231_MINUTES_REG_OFFSET);
-			//*rtc_data_hour = rtc_read(DS3231_HOURS_REG_OFFSET);
+			rtc_data_sec = rtc_read(DS3231_SECONDS_REG_OFFSET);
+			rtc_data_min = rtc_read(DS3231_MINUTES_REG_OFFSET);
+			rtc_data_hour = rtc_read(DS3231_HOURS_REG_OFFSET);
 		
 			// Organize into nixie tube data.
 		
@@ -309,14 +314,15 @@ int main(void)
 		
 		
 			// Minutes
-		
+			set_tube_digit(nixie, toMinutes(rtc_data_min)%10, HUNDREDS_TUBE);
+			set_tube_digit(nixie, toMinutes(rtc_data_min)/10, THOUSANDS_TUBE);
 		
 			// Seconds
-			//*set_tube_digit(nixie, toSeconds(rtc_data_sec)%10, ONES_TUBE);
-			//*set_tube_digit(nixie, toSeconds(rtc_data_sec)/10, TENS_TUBE);
+			set_tube_digit(nixie, toSeconds(rtc_data_sec)%10, ONES_TUBE);
+			set_tube_digit(nixie, toSeconds(rtc_data_sec)/10, TENS_TUBE);
 		
 			// Display
-			//*display(nixie, NUMBER_OF_TUBES);
+			display(nixie, NUMBER_OF_TUBES);
 		
 			// scroll effect, delaying is very bad when interrutpts are enabled.
 			//_delay_ms(800);
@@ -327,12 +333,12 @@ int main(void)
 			// Tube Type:	B 12 A   B   A
 			// Tube Digit:	1 2  3   4   5
 			
-			set_tube_digit(nixie, IN15B_W, 1);
-			set_tube_digit(nixie, 0, 2);
-			set_tube_digit(nixie, IN15A_m, 3);
-			set_tube_digit(nixie, IN15B_A, 4);
-			set_tube_digit(nixie, IN15A_pi_upper, 5);
-			display(nixie, NUMBER_OF_TUBES);
+			//set_tube_digit(nixie, IN15B_W, 1);
+			//set_tube_digit(nixie, 0, 2);
+			//set_tube_digit(nixie, IN15A_m, 3);
+			//set_tube_digit(nixie, IN15B_A, 4);
+			//set_tube_digit(nixie, IN15A_pi_upper, 5);
+			//display(nixie, NUMBER_OF_TUBES);
 			
 			// things learned:
 			// 1: _delay requires a compile time constant... hence the massive text below
