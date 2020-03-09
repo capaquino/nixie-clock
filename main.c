@@ -12,6 +12,8 @@
 #define F_CPU 8000000UL
 #include <util/delay.h>
 
+#pragma region 74HC595N Shift Register
+
 //////////////////////////////////////////////////////////////////////////
 /// Shift Register
 //////////////////////////////////////////////////////////////////////////
@@ -105,6 +107,10 @@ void shift_byte_lsb(uint8_t data)
 	hc595_latch_pulse();
 }
 
+#pragma endregion 74HC595N Shift Register
+
+#pragma region Nixie Functions
+
 //////////////////////////////////////////////////////////////////////////
 /// Nixie - requires Shift Register
 //////////////////////////////////////////////////////////////////////////
@@ -191,6 +197,10 @@ void clear_tubes(uint8_t bytes[], unsigned int numberOfTubes)
 	display(bytes, numberOfTubes);
 }
 
+#pragma endregion Nixie Functions
+
+#pragma region I2C
+
 //////////////////////////////////////////////////////////////////////////
 /// I2C
 //////////////////////////////////////////////////////////////////////////
@@ -198,14 +208,97 @@ void clear_tubes(uint8_t bytes[], unsigned int numberOfTubes)
 #include "i2cmaster.h"
 #include "rtc.h"
 
+#pragma endregion I2C
+
+#pragma region Interrupts
+
 //////////////////////////////////////////////////////////////////////////
 /// Interrupts
 //////////////////////////////////////////////////////////////////////////
 
 #include <avr/interrupt.h>
 
-volatile bool nixieOutputOn = false; // volatile is NECESSARY
+/* Globals accessed during interrupts. volatile is necessary for any variables accessed in ISRs */
 
+volatile bool nixieOutputOn = false;
+
+
+/* Routines */
+
+// In main: initialize with for interrupts on PC0/1/2.
+//DDRC &= ~(1<<PORTC0 | 1<<PORTC1 | 1<<PORTC2);	// set pins to be used as interrupts as inputs
+//PORTC |= 1<<PORTC0 | 1<<PORTC1 | 1<<PORTC2;	// enable internal pullups
+//PCICR |= 1<<PCIE1; // Enable interrupt 1 (interrupt for pins that have PCINT8-14 aka PORTC
+//PCMSK1 |= 1<<PCINT8 | 1<<PCINT9 | 1<<PCINT10; // Set which pins from PCINT8-14 cause interrupt. In this case, set PC0 PC1 PC2.
+//PCIFR |= 0x02;
+
+ISR(PCINT1_vect)
+{
+	if (   (PINC & 1<<PINC0)   // Use && and not || because when no buttons are pressed
+		&& (PINC & 1<<PINC1)   // all pins read 1 because of pullups. If they are not all
+		&& (PINC & 1<<PINC2) ) // 1 (meaning unpressed) then that means atleast 1 IS pressed.
+							   // Can get rid of this if/else if you have no rising edge functionality.
+	{
+		// rising edge do nothing	
+	}
+	else // falling edge, figure out which triggered
+	{
+		//	conditional statements equivalent to:
+		//	uint8_t mask	= 1<<PINC0 | 1<<PINC1 | 1<<PINC2; == 0x07	
+		//  uint8_t filter  = PINC & mask;
+		//			filter  = ~filter;
+		// 	if (filter & 1<<PINCX)
+			
+		if (~(PINC & 0x07) & 1<<PINC0) // PC0 triggered
+		{
+			if (nixieOutputOn == true)
+			{
+				nixieOutputOn = false;
+			}
+			else
+			{
+				nixieOutputOn = true;
+			}
+		}
+		else if (~(PINC & 0x07) & 1<<PINC1) // PC1 triggered
+		{
+			if (nixieOutputOn == true)
+			{
+				nixieOutputOn = false;
+			}
+			else
+			{
+				nixieOutputOn = true;
+			}
+		}
+		
+		else if (~(PINC & 0x07) & 1<<PINC2) // PC2 triggered
+		{
+			if (nixieOutputOn == true)
+			{
+				nixieOutputOn = false;
+			}
+			else
+			{
+				nixieOutputOn = true;
+			}
+		}
+	}
+	
+	
+	/*PCIFR = 0x01; Clear interrupt flag. Automatically done.*/
+}
+
+// In main: initialize with
+//
+// PCICR |= 1<<PCIE0;// Enable interrupt 0 (interrupt for pins that have PCINT0-7 aka PORTB
+// PCMSK0 |= 1<<PCINT0; // Set which pins from PCINT0-7 cause interrupt. In this case, set PB0.
+//
+// PCIFR |= 0x01; // clear old/stray interrupts for PCINT0
+// sei(); // enable interrupts
+//
+
+// display on/off pushbutton
 ISR(PCINT0_vect)
 {
 	if (PINB & 1<<PINB0) // rising edge, do nothing
@@ -226,6 +319,10 @@ ISR(PCINT0_vect)
 	
 	/*PCIFR = 0x01; Clear interrupt flag. Automatically done.*/
 }
+
+#pragma endregion Interrupts
+
+#pragma region IN15A/B Symbol Map
 
 //////////////////////////////////////////////////////////////////////////
 /// IN15A Symbol Map
@@ -255,6 +352,10 @@ ISR(PCINT0_vect)
 #define IN15B_F			9
 #define IN15B_W			0
 
+#pragma endregion IN15A/B Symbol Map
+
+#pragma region Main
+
 //////////////////////////////////////////////////////////////////////////
 /// Main
 //////////////////////////////////////////////////////////////////////////
@@ -278,7 +379,7 @@ int main(void)
 	
 	// Init DS3231
 	rtc_write(DS3231_CONTROL_REG_OFFSET,0x00);
-	rtc_write(DS3231_HOURS_REG_OFFSET,toRegisterValue(10)); // this may or may not be 12
+	rtc_write(DS3231_HOURS_REG_OFFSET,toRegisterValue(10));
 	rtc_write(DS3231_MINUTES_REG_OFFSET,toRegisterValue(59));
 	rtc_write(DS3231_SECONDS_REG_OFFSET,toRegisterValue(45));
 	uint8_t rtc_data_sec = 0;
@@ -290,13 +391,22 @@ int main(void)
 	clear_tubes(nixie, NUMBER_OF_TUBES);
 	display(nixie, NUMBER_OF_TUBES);
 	
-	// init interrupts
+	/* init interrupts */
+	
+	// PORTB interrupts (Display on/off)
 	DDRB &= ~(1<<PORTB0); // Set as input
 	PORTB |= 1<<PORTB0; // Set internal pullup.
 	PCICR |= 1<<PCIE0;// Enable interrupt 0 (interrupt for pins that have PCINT0-7)
 	PCMSK0 |= 1<<PCINT0; // Set which pins from PCINT0-7 cause interrupt. In this case, set PB0.
+	PCIFR |= 0x01; // clear old/stray interrupts for PCINT0
 	
-	PCIFR = 0x01; // clear old/stray interrupts for PCINT0
+	// PORTC interrupts (time programming interrupts)
+	DDRC &= ~(1<<PORTC0 | 1<<PORTC1 | 1<<PORTC2); // set as inputs
+	PORTC |= 1<<PORTC0 | 1<<PORTC1 | 1<<PORTC2; // set internal pullups
+	PCICR |= 1<<PCIE1; // Enable interrupt 1 (interrupt for pins that have PCINT8-14 aka PORTC
+	PCMSK1 |= 1<<PCINT8 | 1<<PCINT9 | 1<<PCINT10; // Set which pins from PCINT8-14 cause interrupt. In this case, set PC0 PC1 PC2.
+	PCIFR |= 0x02;
+
 	sei(); // enable interrupts
 	
 	while (1)
@@ -306,7 +416,7 @@ int main(void)
 			// Get clock data
 			rtc_data_sec = rtc_read(DS3231_SECONDS_REG_OFFSET);
 			rtc_data_min = rtc_read(DS3231_MINUTES_REG_OFFSET);
-			rtc_data_hour = rtc_read(DS3231_HOURS_REG_OFFSET);
+			//rtc_data_hour = rtc_read(DS3231_HOURS_REG_OFFSET);
 		
 			// Organize into nixie tube data.
 		
@@ -322,103 +432,7 @@ int main(void)
 			set_tube_digit(nixie, toSeconds(rtc_data_sec)/10, TENS_TUBE);
 		
 			// Display
-			display(nixie, NUMBER_OF_TUBES);
-		
-			// scroll effect, delaying is very bad when interrutpts are enabled.
-			//_delay_ms(800);
-			//scroll(NUMBER_OF_TUBES);
-			
-			// International Women's Day Post
-			// Symbol:		W 0  M/m A/F n/pi_upper
-			// Tube Type:	B 12 A   B   A
-			// Tube Digit:	1 2  3   4   5
-			
-			//set_tube_digit(nixie, IN15B_W, 1);
-			//set_tube_digit(nixie, 0, 2);
-			//set_tube_digit(nixie, IN15A_m, 3);
-			//set_tube_digit(nixie, IN15B_A, 4);
-			//set_tube_digit(nixie, IN15A_pi_upper, 5);
-			//display(nixie, NUMBER_OF_TUBES);
-			
-			// things learned:
-			// 1: _delay requires a compile time constant... hence the massive text below
-			// 2: _delay affects messy nixie tube circuits.
-			
-			
-			// ...
-			// to blink tubes uncomment the following
-			//_delay_ms(2000);
-			//turn_off_display(NUMBER_OF_TUBES);
-			//_delay_ms(2000);
-			//
-			//
-			//// down
-			//display(nixie, NUMBER_OF_TUBES);
-			//_delay_ms(1600);
-			//turn_off_display(NUMBER_OF_TUBES);
-			//_delay_ms(1600);
-					//display(nixie, NUMBER_OF_TUBES);
-					//_delay_ms(1200);
-					//turn_off_display(NUMBER_OF_TUBES);
-					//_delay_ms(1200);
-							//display(nixie, NUMBER_OF_TUBES);
-							//_delay_ms(800);
-							//turn_off_display(NUMBER_OF_TUBES);
-							//_delay_ms(800);
-									//display(nixie, NUMBER_OF_TUBES);
-									//_delay_ms(600);
-									//turn_off_display(NUMBER_OF_TUBES);
-									//_delay_ms(600);
-											//display(nixie, NUMBER_OF_TUBES);
-											//_delay_ms(400);
-											//turn_off_display(NUMBER_OF_TUBES);
-											//_delay_ms(400);
-													//display(nixie, NUMBER_OF_TUBES);
-													//_delay_ms(300);
-													//turn_off_display(NUMBER_OF_TUBES);
-													//_delay_ms(300);
-															//display(nixie, NUMBER_OF_TUBES);
-															//_delay_ms(200);
-															//turn_off_display(NUMBER_OF_TUBES);
-															//_delay_ms(200);
-																	//display(nixie, NUMBER_OF_TUBES);
-																	//_delay_ms(100);
-																	//turn_off_display(NUMBER_OF_TUBES);
-																	//_delay_ms(100);
-			////up
-			//display(nixie, NUMBER_OF_TUBES);
-			//_delay_ms(100);
-			//turn_off_display(NUMBER_OF_TUBES);
-			//_delay_ms(100);
-					//display(nixie, NUMBER_OF_TUBES);
-					//_delay_ms(200);
-					//turn_off_display(NUMBER_OF_TUBES);
-					//_delay_ms(200);
-							//display(nixie, NUMBER_OF_TUBES);
-							//_delay_ms(300);
-							//turn_off_display( NUMBER_OF_TUBES);
-							//_delay_ms(300);
-									//display(nixie, NUMBER_OF_TUBES);
-									//_delay_ms(400);
-									//turn_off_display(NUMBER_OF_TUBES);
-									//_delay_ms(400);
-											//display(nixie, NUMBER_OF_TUBES);
-											//_delay_ms(600);
-											//turn_off_display(NUMBER_OF_TUBES);
-											//_delay_ms(600);
-													//display(nixie, NUMBER_OF_TUBES);
-													//_delay_ms(800);
-													//turn_off_display(NUMBER_OF_TUBES);
-													//_delay_ms(800);
-															//display(nixie, NUMBER_OF_TUBES);
-															//_delay_ms(1200);
-															//turn_off_display(NUMBER_OF_TUBES);
-															//_delay_ms(1200);
-																	//display(nixie, NUMBER_OF_TUBES);
-																	//_delay_ms(1600);
-																	//turn_off_display(NUMBER_OF_TUBES);
-																	//_delay_ms(1600);
-			
+			display(nixie, NUMBER_OF_TUBES);			
 		}
 		else
 		{
@@ -427,15 +441,4 @@ int main(void)
 	}
 }
 
-			//for (int tube = 0; tube<NUMBER_OF_TUBES;tube++)
-			//{
-			//switch (tube)
-			//{
-			//case 0:	set_tube_digit(nixie, IN15B_W,			1); break;
-			//case 1:	set_tube_digit(nixie, 0,				2); break;
-			//case 2:	set_tube_digit(nixie, IN15A_m,			3); break;
-			//case 3:	set_tube_digit(nixie, IN15B_A,			4); break;
-			//case 4:	set_tube_digit(nixie, IN15A_pi_upper,	5); break;
-			//}
-			//display(nixie, NUMBER_OF_TUBES);
-			//
+#pragma endregion Main
