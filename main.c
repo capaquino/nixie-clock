@@ -222,6 +222,20 @@ void clear_tubes(uint8_t bytes[], unsigned int numberOfTubes)
 
 volatile bool nixieOutputOn = false;
 
+typedef enum
+{
+	NOT_PROGRAMMING = 0,
+//	HOURS,
+	MINUTES,
+	SECONDS,
+	LAST_STATE
+} ProgrammingModeState;
+
+volatile ProgrammingModeState programmingModeState = NOT_PROGRAMMING;
+
+volatile int8_t hours = 0;
+volatile int8_t minutes = 0;
+volatile int8_t seconds = 0;
 
 /* Routines */
 
@@ -239,7 +253,7 @@ ISR(PCINT1_vect)
 		&& (PINC & 1<<PINC2) ) // 1 (meaning unpressed) then that means atleast 1 IS pressed.
 							   // Can get rid of this if/else if you have no rising edge functionality.
 	{
-		// rising edge do nothing	
+		// rising edge do nothing, left here incase of future functionality.
 	}
 	else // falling edge, figure out which triggered
 	{
@@ -249,39 +263,44 @@ ISR(PCINT1_vect)
 		//			filter  = ~filter;
 		// 	if (filter & 1<<PINCX)
 			
-		if (~(PINC & 0x07) & 1<<PINC0) // PC0 triggered
+		if (~(PINC & 0x07) & 1<<PINC0) // plus button PC0 triggered
 		{
-			if (nixieOutputOn == true)
+			switch (programmingModeState)
 			{
-				nixieOutputOn = false;
+				case NOT_PROGRAMMING:					break;
+//				case HOURS:				hours++;		break; // Must do bounds check BEFORE modification if using unsigned type. uint8_t is unsigned.
+				case MINUTES:			minutes++;		break; // Overflow error will happen between -- and bounds check if bounds check done after modification.
+				case SECONDS:			seconds++;		break; // >= 60 and < 0 is post modification bounds checking, >= 59 and <1/<=0/==0 is pre modification bounds checking.
+				case LAST_STATE:						break; // *NOTE*: Now adjusted to using signed type so can do more advanced increment behaviour. Easier w/ signed type.
+				default:								break;
 			}
-			else
-			{
-				nixieOutputOn = true;
-			}
-		}
-		else if (~(PINC & 0x07) & 1<<PINC1) // PC1 triggered
-		{
-			if (nixieOutputOn == true)
-			{
-				nixieOutputOn = false;
-			}
-			else
-			{
-				nixieOutputOn = true;
-			}
+			if (seconds>=60) { seconds = 0; minutes++;	}			// Must be done in this order.
+			if (minutes>=60) { minutes = 0; hours++;	}
+			//if (hours>=24)     hours = 0;
+			
 		}
 		
-		else if (~(PINC & 0x07) & 1<<PINC2) // PC2 triggered
+		else if (~(PINC & 0x07) & 1<<PINC1) // minus button PC1 triggered
 		{
-			if (nixieOutputOn == true)
+			switch (programmingModeState)
 			{
-				nixieOutputOn = false;
+				case NOT_PROGRAMMING:					break;
+//				case HOURS:				hours--;		break; // Must do bounds check BEFORE modification if using unsigned type. uint8_t is unsigned.
+				case MINUTES:			minutes--;		break; // Overflow error will happen between -- and bounds check if bounds check done after modification.
+				case SECONDS:			seconds--;		break; // >= 60 and < 0 is post modification bounds checking, >= 59 and <1/<=0/==0 is pre modification bounds checking.
+				case LAST_STATE:						break; // *NOTE*: Now adjusted to using signed type so can do more advanced increment behaviour. Easier w/ signed type.
+				default:								break;
 			}
-			else
-			{
-				nixieOutputOn = true;
-			}
+			
+			if (seconds<0) { seconds = 59; minutes--;	}			// Must be done in this order.
+			if (minutes<0) { minutes = 59; hours--;		}
+			//if (hours<0)     hours = 23;
+		}
+		
+		else if (~(PINC & 0x07) & 1<<PINC2) // programming mode hours/min/sec. PC2 triggered
+		{
+			programmingModeState++; // advance to next mode
+			if (programmingModeState == LAST_STATE) programmingModeState = NOT_PROGRAMMING;
 		}
 	}
 	
@@ -362,12 +381,19 @@ ISR(PCINT0_vect)
 
 // This needs to change depending on the number of tubes
 
+// Variable, for use in any display.
 #define ONES_TUBE		4		// 2 with two tubes	// 4 with four tubes // 6 with 6 tubes
 #define TENS_TUBE		3		// 1 with two tubes // 3 with four tubes // 5 with 6 tubes
 #define HUNDREDS_TUBE	2							// 2 with four tubes // 4 with 6 tubes
 #define THOUSANDS_TUBE	1							// 1 with four tubes // 3 with 6 tubes
 
-
+// Strictly for 6 tube clock
+//#define HOURS_TENS_TUBE		1
+//#define HOURS_ONES_TUBE		2
+//#define MINUTES_TENS_TUBE	3
+//#define MINUTES_ONES_TUBE	4
+//#define SECONDS_TENS_TUBE	5
+//#define SECONDS_ONES_TUBE	6
 
 int main(void)
 {
@@ -413,26 +439,82 @@ int main(void)
 	{
 		if (nixieOutputOn == true)
 		{
-			// Get clock data
-			rtc_data_sec = rtc_read(DS3231_SECONDS_REG_OFFSET);
-			rtc_data_min = rtc_read(DS3231_MINUTES_REG_OFFSET);
-			//rtc_data_hour = rtc_read(DS3231_HOURS_REG_OFFSET);
-		
-			// Organize into nixie tube data.
-		
-			// Hours
-		
-		
-			// Minutes
-			set_tube_digit(nixie, toMinutes(rtc_data_min)%10, HUNDREDS_TUBE);
-			set_tube_digit(nixie, toMinutes(rtc_data_min)/10, THOUSANDS_TUBE);
-		
-			// Seconds
-			set_tube_digit(nixie, toSeconds(rtc_data_sec)%10, ONES_TUBE);
-			set_tube_digit(nixie, toSeconds(rtc_data_sec)/10, TENS_TUBE);
-		
-			// Display
-			display(nixie, NUMBER_OF_TUBES);			
+			if (programmingModeState == NOT_PROGRAMMING)
+			{
+				// Get clock data
+				rtc_data_sec = rtc_read(DS3231_SECONDS_REG_OFFSET);
+				rtc_data_min = rtc_read(DS3231_MINUTES_REG_OFFSET);
+				// rtc_data_hour = rtc_read(DS3231_HOURS_REG_OFFSET);
+				
+				// Save values so when programming mode is entered, the values they start adjusting from are near what they saw.
+				// And also convenient for the code that actually displays.
+				// hours = toHours(rtc_data_hour);
+				minutes = toMinutes(rtc_data_min);
+				seconds = toSeconds(rtc_data_sec);
+				
+				/* Organize into nixie tube data. */
+				
+				// Hours
+				// set_tube_digit(nixie, minutes%10, HOURS_ONES_TUBE);
+				// set_tube_digit(nixie, minutes/10, HOURS_TENS_TUBE);
+				
+				// Minutes
+				set_tube_digit(nixie, minutes%10, HUNDREDS_TUBE);
+				set_tube_digit(nixie, minutes/10, THOUSANDS_TUBE);
+				
+				// Seconds
+				set_tube_digit(nixie, seconds%10, ONES_TUBE);
+				set_tube_digit(nixie, seconds/10, TENS_TUBE);
+				
+				// Display
+				display(nixie, NUMBER_OF_TUBES);
+				
+				
+				
+			}
+			
+			//else if (programmingModeState == HOURS)
+			//{
+				// blink hours tubes or something to indicate programming of these digits. Do not use delays.
+				// ...
+				
+				//rtc_write(DS3231_HOURS_REG_OFFSET,toRegisterValue(hours));
+				//set_tube_digit(nixie, hours%10, HOURS_ONES_TUBE);
+				//set_tube_digit(nixie, hours/10, HOURS_TENS_TUBE);
+				//display(nixie, NUMBER_OF_TUBES);
+			//}
+			else if (programmingModeState == MINUTES)
+			{
+				// blink minutes tubes or something to indicate programming of these digits. Do not use delays.
+				// ...
+				
+				rtc_write(DS3231_MINUTES_REG_OFFSET,toRegisterValue(minutes));
+				set_tube_digit(nixie, minutes%10, HUNDREDS_TUBE);
+				set_tube_digit(nixie, minutes/10, THOUSANDS_TUBE);
+				
+				// Update the hours as well, in case modifying seconds has ++ or -- the hours.
+				//rtc_write(DS3231_HOURS_REG_OFFSET,toRegisterValue(hours));
+				//set_tube_digit(nixie, hours%10, HOURS_ONES_TUBE);
+				//set_tube_digit(nixie, hours/10, HOURS_TENS_TUBE);
+				
+				display(nixie, NUMBER_OF_TUBES);
+			}
+			else if (programmingModeState == SECONDS)
+			{
+				// blink seconds tubes or something to indicate programming of these digits. Do not use delays.
+				// ...
+				
+				rtc_write(DS3231_SECONDS_REG_OFFSET,toRegisterValue(seconds));
+				set_tube_digit(nixie, seconds%10, ONES_TUBE);
+				set_tube_digit(nixie, seconds/10, TENS_TUBE);
+				
+				// Update the minutes as well, in case modifying seconds has ++ or -- the minutes.
+				rtc_write(DS3231_MINUTES_REG_OFFSET,toRegisterValue(minutes));
+				set_tube_digit(nixie, minutes%10, HUNDREDS_TUBE);
+				set_tube_digit(nixie, minutes/10, THOUSANDS_TUBE);
+				
+				display(nixie, NUMBER_OF_TUBES);
+			}		
 		}
 		else
 		{
