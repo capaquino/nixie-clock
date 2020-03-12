@@ -324,7 +324,7 @@ ISR(PCINT0_vect)
 	{
 
 	}
-	else // falling edge
+	else if (~(PINB & 0x01) & 1<<PINB0) // falling edge
 	{
 		if (nixieOutputOn == true)
 		{
