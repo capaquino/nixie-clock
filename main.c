@@ -23,6 +23,7 @@
 #define HC595_DATA PORTD0
 #define HC595_CLOCK PORTD1
 #define HC595_LATCH PORTD2
+#define HC595_nOE	PORTD3
 
 void hc595_clock_pulse(void)
 {
@@ -38,6 +39,8 @@ void hc595_latch_pulse(void)
 
 void shift_bytes_msb(uint8_t bytes[], unsigned int numberOfBytes)
 {
+	HC595_PORT |= 1<<HC595_nOE; // turn off
+	
 	uint8_t data = 0;
 	
 	for (unsigned int b = 0; b < numberOfBytes; b++)
@@ -61,6 +64,8 @@ void shift_bytes_msb(uint8_t bytes[], unsigned int numberOfBytes)
 	}
 	
 	hc595_latch_pulse();
+	
+	HC595_PORT &= ~(1<<HC595_nOE); // turn on
 }
 
 void shift_byte_msb(uint8_t data)
@@ -407,8 +412,8 @@ ISR(TIMER0_OVF_vect)
 int main(void)
 {
 	// Init Shift register
-	HC595_DDR = 1<<HC595_DATA | 1<<HC595_CLOCK | 1<<HC595_LATCH;
-	
+	HC595_DDR = 1<<HC595_DATA | 1<<HC595_CLOCK | 1<<HC595_LATCH | 1<<HC595_nOE;
+	PORTD &= ~(1<<HC595_DATA | 1<<HC595_CLOCK | 1<<HC595_LATCH) | 1<<HC595_nOE;
 	// Init I2C
 	i2c_init();
 	
