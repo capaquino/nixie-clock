@@ -346,15 +346,15 @@ ISR(PCINT0_vect)
 	//updateFlag = true;	
 //}
 
-//#define TFACTOR 20
-//volatile unsigned int counter = 0;
-//
-//ISR(TIMER0_OVF_vect)
-//{
-	//counter++;
-	//
-	//if (counter == 10*TFACTOR) counter = 0;
-//}
+#define TFACTOR 20
+volatile unsigned int counter = 0;
+
+ISR(TIMER0_OVF_vect)
+{
+	counter++;
+	
+	if (counter == 10*TFACTOR) counter = 0;
+}
 
 #pragma endregion Interrupts
 
@@ -443,9 +443,9 @@ int main(void)
 	PCIFR |= 0x02;
 	
 	// Timer interrupt
-	//TCCR0A = 0x00;
-	//TCCR0B = 0x05; // prescaler 1024
-	//TIMSK0 = 1<<TOIE0;
+	TCCR0A = 0x00;
+	TCCR0B = 0x05; // prescaler 1024
+	TIMSK0 = 1<<TOIE0;
 	
 
 	sei(); // enable interrupts
@@ -528,19 +528,19 @@ int main(void)
 		else
 		{
 			// normal operation.
-			turn_off_display(NUMBER_OF_TUBES);
+			// turn_off_display(NUMBER_OF_TUBES);
 			
-			//// if counting
-			//if (counter % TFACTOR == 0)
-			//{
-				//set_tube_digit(nixie, counter/TFACTOR, HOURS_ONES_TUBE);
-				//set_tube_digit(nixie, counter/TFACTOR, HOURS_TENS_TUBE);
-				//set_tube_digit(nixie, counter/TFACTOR, MINUTES_ONES_TUBE);
-				//set_tube_digit(nixie, counter/TFACTOR, MINUTES_TENS_TUBE);
-				//set_tube_digit(nixie, counter/TFACTOR, SECONDS_ONES_TUBE);
-				//set_tube_digit(nixie, counter/TFACTOR, SECONDS_TENS_TUBE);
-			//}
-			//display(nixie, NUMBER_OF_TUBES);
+			// if counting
+			if (counter % TFACTOR == 0)
+			{
+				set_tube_digit(nixie, counter/TFACTOR, HOURS_ONES_TUBE);
+				set_tube_digit(nixie, counter/TFACTOR, HOURS_TENS_TUBE);
+				set_tube_digit(nixie, counter/TFACTOR, MINUTES_ONES_TUBE);
+				set_tube_digit(nixie, counter/TFACTOR, MINUTES_TENS_TUBE);
+				set_tube_digit(nixie, counter/TFACTOR, SECONDS_ONES_TUBE);
+				set_tube_digit(nixie, counter/TFACTOR, SECONDS_TENS_TUBE);
+			}
+			display(nixie, NUMBER_OF_TUBES);
 		}
 	}
 }
