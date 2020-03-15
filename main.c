@@ -33,9 +33,7 @@ void hc595_clock_pulse(void)
 void hc595_latch_pulse(void)
 {
 	HC595_PORT |= 1<<HC595_LATCH;
-	//_delay_us(1);
 	HC595_PORT &= ~(1<<HC595_LATCH);
-	//_delay_us(1);
 }
 
 void shift_bytes_msb(uint8_t bytes[], unsigned int numberOfBytes)
@@ -115,7 +113,7 @@ void shift_byte_lsb(uint8_t data)
 /// Nixie - requires Shift Register
 //////////////////////////////////////////////////////////////////////////
 
-#define NUMBER_OF_TUBES 4
+#define NUMBER_OF_TUBES 6
 #define OFF 0xF
 
 void set_tube_digit(uint8_t bytes[], uint8_t digit, unsigned int tube)
@@ -225,7 +223,7 @@ volatile bool nixieOutputOn = false;
 typedef enum
 {
 	NOT_PROGRAMMING = 0,
-//	HOURS,
+	HOURS,
 	MINUTES,
 	SECONDS,
 	LAST_STATE
@@ -268,7 +266,7 @@ ISR(PCINT1_vect)
 			switch (programmingModeState)
 			{
 				case NOT_PROGRAMMING:					break;
-//				case HOURS:				hours++;		break; // Must do bounds check BEFORE modification if using unsigned type. uint8_t is unsigned.
+				case HOURS:				hours++;		break; // Must do bounds check BEFORE modification if using unsigned type. uint8_t is unsigned.
 				case MINUTES:			minutes++;		break; // Overflow error will happen between -- and bounds check if bounds check done after modification.
 				case SECONDS:			seconds++;		break; // >= 60 and < 0 is post modification bounds checking, >= 59 and <1/<=0/==0 is pre modification bounds checking.
 				case LAST_STATE:						break; // *NOTE*: Now adjusted to using signed type so can do more advanced increment behaviour. Easier w/ signed type.
@@ -276,7 +274,7 @@ ISR(PCINT1_vect)
 			}
 			if (seconds>=60) { seconds = 0; minutes++;	}			// Must be done in this order.
 			if (minutes>=60) { minutes = 0; hours++;	}
-			//if (hours>=24)     hours = 0;
+			if (hours>=24)     hours = 0;
 			
 		}
 		
@@ -285,7 +283,7 @@ ISR(PCINT1_vect)
 			switch (programmingModeState)
 			{
 				case NOT_PROGRAMMING:					break;
-//				case HOURS:				hours--;		break; // Must do bounds check BEFORE modification if using unsigned type. uint8_t is unsigned.
+				case HOURS:				hours--;		break; // Must do bounds check BEFORE modification if using unsigned type. uint8_t is unsigned.
 				case MINUTES:			minutes--;		break; // Overflow error will happen between -- and bounds check if bounds check done after modification.
 				case SECONDS:			seconds--;		break; // >= 60 and < 0 is post modification bounds checking, >= 59 and <1/<=0/==0 is pre modification bounds checking.
 				case LAST_STATE:						break; // *NOTE*: Now adjusted to using signed type so can do more advanced increment behaviour. Easier w/ signed type.
@@ -294,7 +292,7 @@ ISR(PCINT1_vect)
 			
 			if (seconds<0) { seconds = 59; minutes--;	}			// Must be done in this order.
 			if (minutes<0) { minutes = 59; hours--;		}
-			//if (hours<0)     hours = 23;
+			if (hours<0)     hours = 23;
 		}
 		
 		else if (~(PINC & 0x07) & 1<<PINC2) // programming mode hours/min/sec. PC2 triggered
@@ -339,6 +337,25 @@ ISR(PCINT0_vect)
 	/*PCIFR = 0x01; Clear interrupt flag. Automatically done.*/
 }
 
+// Timer interrupt
+
+//volatile bool updateFlag = false; // use if timer is driving when i2c gets fetched. Reset to false once fetch and display is done.
+//
+//ISR(TIMER0_OVF_vect)
+//{
+	//updateFlag = true;	
+//}
+
+//#define TFACTOR 20
+//volatile unsigned int counter = 0;
+//
+//ISR(TIMER0_OVF_vect)
+//{
+	//counter++;
+	//
+	//if (counter == 10*TFACTOR) counter = 0;
+//}
+
 #pragma endregion Interrupts
 
 #pragma region IN15A/B Symbol Map
@@ -379,21 +396,13 @@ ISR(PCINT0_vect)
 /// Main
 //////////////////////////////////////////////////////////////////////////
 
-// This needs to change depending on the number of tubes
-
-// Variable, for use in any display.
-#define ONES_TUBE		4		// 2 with two tubes	// 4 with four tubes // 6 with 6 tubes
-#define TENS_TUBE		3		// 1 with two tubes // 3 with four tubes // 5 with 6 tubes
-#define HUNDREDS_TUBE	2							// 2 with four tubes // 4 with 6 tubes
-#define THOUSANDS_TUBE	1							// 1 with four tubes // 3 with 6 tubes
-
-// Strictly for 6 tube clock
-//#define HOURS_TENS_TUBE		1
-//#define HOURS_ONES_TUBE		2
-//#define MINUTES_TENS_TUBE	3
-//#define MINUTES_ONES_TUBE	4
-//#define SECONDS_TENS_TUBE	5
-//#define SECONDS_ONES_TUBE	6
+// Strictly for 6 tube clock, needs to be adjusted otherwise.
+#define HOURS_TENS_TUBE		1
+#define HOURS_ONES_TUBE		2
+#define MINUTES_TENS_TUBE	3
+#define MINUTES_ONES_TUBE	4
+#define SECONDS_TENS_TUBE	5
+#define SECONDS_ONES_TUBE	6
 
 int main(void)
 {
@@ -432,6 +441,12 @@ int main(void)
 	PCICR |= 1<<PCIE1; // Enable interrupt 1 (interrupt for pins that have PCINT8-14 aka PORTC
 	PCMSK1 |= 1<<PCINT8 | 1<<PCINT9 | 1<<PCINT10; // Set which pins from PCINT8-14 cause interrupt. In this case, set PC0 PC1 PC2.
 	PCIFR |= 0x02;
+	
+	// Timer interrupt
+	//TCCR0A = 0x00;
+	//TCCR0B = 0x05; // prescaler 1024
+	//TIMSK0 = 1<<TOIE0;
+	
 
 	sei(); // enable interrupts
 	
@@ -444,81 +459,88 @@ int main(void)
 				// Get clock data
 				rtc_data_sec = rtc_read(DS3231_SECONDS_REG_OFFSET);
 				rtc_data_min = rtc_read(DS3231_MINUTES_REG_OFFSET);
-				// rtc_data_hour = rtc_read(DS3231_HOURS_REG_OFFSET);
-				
+				rtc_data_hour = rtc_read(DS3231_HOURS_REG_OFFSET);
+									
 				// Save values so when programming mode is entered, the values they start adjusting from are near what they saw.
 				// And also convenient for the code that actually displays.
-				// hours = toHours(rtc_data_hour);
+				hours = toHours(rtc_data_hour);
 				minutes = toMinutes(rtc_data_min);
 				seconds = toSeconds(rtc_data_sec);
-				
+			
 				/* Organize into nixie tube data. */
-				
+									
 				// Hours
-				// set_tube_digit(nixie, minutes%10, HOURS_ONES_TUBE);
-				// set_tube_digit(nixie, minutes/10, HOURS_TENS_TUBE);
-				
+				set_tube_digit(nixie, hours%10, HOURS_ONES_TUBE);
+				set_tube_digit(nixie, hours/10, HOURS_TENS_TUBE);
+									
 				// Minutes
-				set_tube_digit(nixie, minutes%10, HUNDREDS_TUBE);
-				set_tube_digit(nixie, minutes/10, THOUSANDS_TUBE);
-				
+				set_tube_digit(nixie, minutes%10, MINUTES_ONES_TUBE);
+				set_tube_digit(nixie, minutes/10, MINUTES_TENS_TUBE);
+									
 				// Seconds
-				set_tube_digit(nixie, seconds%10, ONES_TUBE);
-				set_tube_digit(nixie, seconds/10, TENS_TUBE);
-				
+				set_tube_digit(nixie, seconds%10, SECONDS_ONES_TUBE);
+				set_tube_digit(nixie, seconds/10, SECONDS_TENS_TUBE);
+									
 				// Display
 				display(nixie, NUMBER_OF_TUBES);
-				
-				
-				
 			}
 			
-			//else if (programmingModeState == HOURS)
-			//{
-				// blink hours tubes or something to indicate programming of these digits. Do not use delays.
-				// ...
+			else if (programmingModeState == HOURS)
+			{	
+				rtc_write(DS3231_HOURS_REG_OFFSET,toRegisterValue(hours));
+				set_tube_digit(nixie, hours%10, HOURS_ONES_TUBE);
+				set_tube_digit(nixie, hours/10, HOURS_TENS_TUBE);
 				
-				//rtc_write(DS3231_HOURS_REG_OFFSET,toRegisterValue(hours));
-				//set_tube_digit(nixie, hours%10, HOURS_ONES_TUBE);
-				//set_tube_digit(nixie, hours/10, HOURS_TENS_TUBE);
-				//display(nixie, NUMBER_OF_TUBES);
-			//}
+				display(nixie, NUMBER_OF_TUBES);
+			}
 			else if (programmingModeState == MINUTES)
-			{
-				// blink minutes tubes or something to indicate programming of these digits. Do not use delays.
-				// ...
-				
+			{	
 				rtc_write(DS3231_MINUTES_REG_OFFSET,toRegisterValue(minutes));
-				set_tube_digit(nixie, minutes%10, HUNDREDS_TUBE);
-				set_tube_digit(nixie, minutes/10, THOUSANDS_TUBE);
+				set_tube_digit(nixie, minutes%10, MINUTES_ONES_TUBE);
+				set_tube_digit(nixie, minutes/10, MINUTES_TENS_TUBE);
 				
 				// Update the hours as well, in case modifying seconds has ++ or -- the hours.
-				//rtc_write(DS3231_HOURS_REG_OFFSET,toRegisterValue(hours));
-				//set_tube_digit(nixie, hours%10, HOURS_ONES_TUBE);
-				//set_tube_digit(nixie, hours/10, HOURS_TENS_TUBE);
+				rtc_write(DS3231_HOURS_REG_OFFSET,toRegisterValue(hours));
+				set_tube_digit(nixie, hours%10, HOURS_ONES_TUBE);
+				set_tube_digit(nixie, hours/10, HOURS_TENS_TUBE);
 				
 				display(nixie, NUMBER_OF_TUBES);
 			}
 			else if (programmingModeState == SECONDS)
-			{
-				// blink seconds tubes or something to indicate programming of these digits. Do not use delays.
-				// ...
-				
+			{	
 				rtc_write(DS3231_SECONDS_REG_OFFSET,toRegisterValue(seconds));
-				set_tube_digit(nixie, seconds%10, ONES_TUBE);
-				set_tube_digit(nixie, seconds/10, TENS_TUBE);
+				set_tube_digit(nixie, seconds%10, SECONDS_ONES_TUBE);
+				set_tube_digit(nixie, seconds/10, SECONDS_TENS_TUBE);
 				
 				// Update the minutes as well, in case modifying seconds has ++ or -- the minutes.
 				rtc_write(DS3231_MINUTES_REG_OFFSET,toRegisterValue(minutes));
-				set_tube_digit(nixie, minutes%10, HUNDREDS_TUBE);
-				set_tube_digit(nixie, minutes/10, THOUSANDS_TUBE);
+				set_tube_digit(nixie, minutes%10, MINUTES_ONES_TUBE);
+				set_tube_digit(nixie, minutes/10, MINUTES_TENS_TUBE);
+				
+				// Update the hours as well, in case modifying seconds has ++ or -- the hours.
+				rtc_write(DS3231_HOURS_REG_OFFSET,toRegisterValue(hours));
+				set_tube_digit(nixie, hours%10, HOURS_ONES_TUBE);
+				set_tube_digit(nixie, hours/10, HOURS_TENS_TUBE);
 				
 				display(nixie, NUMBER_OF_TUBES);
 			}		
 		}
 		else
 		{
+			// normal operation.
 			turn_off_display(NUMBER_OF_TUBES);
+			
+			//// if counting
+			//if (counter % TFACTOR == 0)
+			//{
+				//set_tube_digit(nixie, counter/TFACTOR, HOURS_ONES_TUBE);
+				//set_tube_digit(nixie, counter/TFACTOR, HOURS_TENS_TUBE);
+				//set_tube_digit(nixie, counter/TFACTOR, MINUTES_ONES_TUBE);
+				//set_tube_digit(nixie, counter/TFACTOR, MINUTES_TENS_TUBE);
+				//set_tube_digit(nixie, counter/TFACTOR, SECONDS_ONES_TUBE);
+				//set_tube_digit(nixie, counter/TFACTOR, SECONDS_TENS_TUBE);
+			//}
+			//display(nixie, NUMBER_OF_TUBES);
 		}
 	}
 }
