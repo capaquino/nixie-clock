@@ -18,28 +18,42 @@
 /// Shift Register
 //////////////////////////////////////////////////////////////////////////
 
-#define HC595_PORT PORTD
-#define HC595_DDR DDRD
-#define HC595_DATA PORTD0
-#define HC595_CLOCK PORTD1
-#define HC595_LATCH PORTD2
-#define HC595_nOE	PORTD3
+#define HC595_PORT_HOURS PORTD
+#define HC595_DDR_HOURS DDRD
+#define HC595_DATA_HOURS PORTD0
+#define HC595_CLOCK_HOURS PORTD1
+#define HC595_LATCH_HOURS PORTD2
+//#define HC595_nOE_HOURS	PORTD3
 
-void hc595_clock_pulse(void)
+#define HC595_PORT_MINUTES PORTD
+#define HC595_DDR_MINUTES DDRD
+#define HC595_DATA_MINUTES PORTD4
+#define HC595_CLOCK_MINUTES PORTD5
+#define HC595_LATCH_MINUTES PORTD6
+//#define HC595_nOE_MINUTES	PORTD3
+
+#define HC595_PORT_SEC PORTB
+#define HC595_DDR_SEC DDRB
+#define HC595_DATA_SEC PORTB1
+#define HC595_CLOCK_SEC PORTB6
+#define HC595_LATCH_SEC PORTB7
+//#define HC595_nOE_SEC	PORTD3
+
+void hc595_clock_pulse_hours(void)
 {
-	HC595_PORT |= 1<<HC595_CLOCK;
-	HC595_PORT &= ~(1<<HC595_CLOCK);
+	HC595_PORT_HOURS |= 1<<HC595_CLOCK_HOURS;
+	HC595_PORT_HOURS &= ~(1<<HC595_CLOCK_HOURS);
 }
 
-void hc595_latch_pulse(void)
+void hc595_latch_pulse_hours(void)
 {
-	HC595_PORT |= 1<<HC595_LATCH;
-	HC595_PORT &= ~(1<<HC595_LATCH);
+	HC595_PORT_HOURS |= 1<<HC595_LATCH_HOURS;
+	HC595_PORT_HOURS &= ~(1<<HC595_LATCH_HOURS);
 }
 
-void shift_bytes_msb(uint8_t bytes[], unsigned int numberOfBytes)
+void shift_bytes_msb_hours(uint8_t bytes[], unsigned int numberOfBytes)
 {
-	HC595_PORT |= 1<<HC595_nOE; // turn off
+	//HC595_PORT_HOURS |= 1<<HC595_nOE_HOURS; // turn off
 	
 	uint8_t data = 0;
 	
@@ -50,43 +64,175 @@ void shift_bytes_msb(uint8_t bytes[], unsigned int numberOfBytes)
 		{
 			if (data & 0x80)
 			{
-				HC595_PORT |= 1<<HC595_DATA;
+				HC595_PORT_HOURS |= 1<<HC595_DATA_HOURS;
 			}
 			else
 			{
-				HC595_PORT &= ~(1<<HC595_DATA);
+				HC595_PORT_HOURS &= ~(1<<HC595_DATA_HOURS);
 			}
 			
-			hc595_clock_pulse();
+			hc595_clock_pulse_hours();
 			
 			data<<=1;
 		}
 	}
 	
-	hc595_latch_pulse();
+	hc595_latch_pulse_hours();
 	
-	HC595_PORT &= ~(1<<HC595_nOE); // turn on
+	//HC595_PORT_HOURS &= ~(1<<HC595_nOE_HOURS); // turn on
 }
 
-void shift_byte_msb(uint8_t data)
+void hc595_clock_pulse_minutes(void)
+{
+	HC595_PORT_MINUTES |= 1<<HC595_CLOCK_MINUTES;
+	HC595_PORT_MINUTES &= ~(1<<HC595_CLOCK_MINUTES);
+}
+
+void hc595_latch_pulse_minutes(void)
+{
+	HC595_PORT_MINUTES |= 1<<HC595_LATCH_MINUTES;
+	HC595_PORT_MINUTES &= ~(1<<HC595_LATCH_MINUTES);
+}
+
+void shift_bytes_msb_minutes(uint8_t bytes[], unsigned int numberOfBytes)
+{
+	//HC595_PORT_MINUTES |= 1<<HC595_nOE_MINUTES; // turn off
+	
+	uint8_t data = 0;
+	
+	for (unsigned int b = 0; b < numberOfBytes; b++)
+	{
+		data = bytes[b];
+		for (uint8_t i = 0; i < 8; i++)
+		{
+			if (data & 0x80)
+			{
+				HC595_PORT_MINUTES |= 1<<HC595_DATA_MINUTES;
+			}
+			else
+			{
+				HC595_PORT_MINUTES &= ~(1<<HC595_DATA_MINUTES);
+			}
+			
+			hc595_clock_pulse_minutes();
+			
+			data<<=1;
+		}
+	}
+	
+	hc595_latch_pulse_minutes();
+	
+	//HC595_PORT_MINUTES &= ~(1<<HC595_nOE_MINUTES); // turn on
+}
+
+
+
+void hc595_clock_pulse_sec(void)
+{
+	HC595_PORT_SEC |= 1<<HC595_CLOCK_SEC;
+	HC595_PORT_SEC &= ~(1<<HC595_CLOCK_SEC);
+}
+
+void hc595_latch_pulse_sec(void)
+{
+	HC595_PORT_SEC |= 1<<HC595_LATCH_SEC;
+	HC595_PORT_SEC &= ~(1<<HC595_LATCH_SEC);
+}
+
+void shift_bytes_msb_sec(uint8_t bytes[], unsigned int numberOfBytes)
+{
+	//HC595_PORT_SEC |= 1<<HC595_nOE_SEC; // turn off
+	
+	uint8_t data = 0;
+	
+	for (unsigned int b = 0; b < numberOfBytes; b++)
+	{
+		data = bytes[b];
+		for (uint8_t i = 0; i < 8; i++)
+		{
+			if (data & 0x80)
+			{
+				HC595_PORT_SEC |= 1<<HC595_DATA_SEC;
+			}
+			else
+			{
+				HC595_PORT_SEC &= ~(1<<HC595_DATA_SEC);
+			}
+			
+			hc595_clock_pulse_sec();
+			
+			data<<=1;
+		}
+	}
+	
+	hc595_latch_pulse_sec();
+	
+	//HC595_PORT_SEC &= ~(1<<HC595_nOE_SEC); // turn on
+}
+
+/////////////////////////////////////////////////////////////////////////
+
+void shift_byte_msb_hours(uint8_t data)
 {
 	for (uint8_t i = 0; i < 8; i++)
 	{
 		if (data & 0x80)
 		{
-			HC595_PORT |= 1<<HC595_DATA;
+			HC595_PORT_HOURS |= 1<<HC595_DATA_HOURS;
 		}
 		else
 		{
-			HC595_PORT &= ~(1<<HC595_DATA);
+			HC595_PORT_HOURS &= ~(1<<HC595_DATA_HOURS);
 		}
 		
-		hc595_clock_pulse();
+		hc595_clock_pulse_hours();
 		
 		data<<=1;
 	}
 	
-	hc595_latch_pulse();
+	hc595_latch_pulse_hours();
+}
+
+void shift_byte_msb_minutes(uint8_t data)
+{
+	for (uint8_t i = 0; i < 8; i++)
+	{
+		if (data & 0x80)
+		{
+			HC595_PORT_MINUTES |= 1<<HC595_DATA_MINUTES;
+		}
+		else
+		{
+			HC595_PORT_MINUTES &= ~(1<<HC595_DATA_MINUTES);
+		}
+		
+		hc595_clock_pulse_minutes();
+		
+		data<<=1;
+	}
+	
+	hc595_latch_pulse_minutes();
+}
+
+void shift_byte_msb_sec(uint8_t data)
+{
+	for (uint8_t i = 0; i < 8; i++)
+	{
+		if (data & 0x80)
+		{
+			HC595_PORT_SEC |= 1<<HC595_DATA_SEC;
+		}
+		else
+		{
+			HC595_PORT_SEC &= ~(1<<HC595_DATA_SEC);
+		}
+		
+		hc595_clock_pulse_sec();
+		
+		data<<=1;
+	}
+	
+	hc595_latch_pulse_sec();
 }
 
 void shift_byte_lsb(uint8_t data)
@@ -95,19 +241,19 @@ void shift_byte_lsb(uint8_t data)
 	{
 		if (data & 0x01)
 		{
-			HC595_PORT |= 1<<HC595_DATA;
+			HC595_PORT_HOURS |= 1<<HC595_DATA_HOURS;
 		}
 		else
 		{
-			HC595_PORT &= ~(1<<HC595_DATA);
+			HC595_PORT_HOURS &= ~(1<<HC595_DATA_HOURS);
 		}
 		
-		hc595_clock_pulse();
+		hc595_clock_pulse_hours();
 		
 		data>>=1;
 	}
 	
-	hc595_latch_pulse();
+	hc595_latch_pulse_hours();
 }
 
 #pragma endregion 74HC595N Shift Register
@@ -157,7 +303,13 @@ void display(uint8_t bytes[], unsigned int numberOfBytes)
 		}
 	}
 	
-	shift_bytes_msb(bytes, squishedBytesSize);
+	// This code is now specific to a 6 tube clock.
+	
+	// Send out squished bytes to each shift register.
+	
+	shift_byte_msb_hours(   bytes[0] );
+	shift_byte_msb_minutes( bytes[1] );
+	shift_byte_msb_sec(     bytes[2] );
 }
 
 void scroll(unsigned int numberOfTubes)
@@ -412,8 +564,16 @@ ISR(TIMER0_OVF_vect)
 int main(void)
 {
 	// Init Shift register
-	HC595_DDR = 1<<HC595_DATA | 1<<HC595_CLOCK | 1<<HC595_LATCH | 1<<HC595_nOE;
-	PORTD &= ~(1<<HC595_DATA | 1<<HC595_CLOCK | 1<<HC595_LATCH) | 1<<HC595_nOE;
+	HC595_DDR_HOURS |= 1<<HC595_DATA_HOURS | 1<<HC595_CLOCK_HOURS | 1<<HC595_LATCH_HOURS;// | 1<<HC595_nOE_HOURS;
+	HC595_PORT_HOURS &= ~(1<<HC595_DATA_HOURS | 1<<HC595_CLOCK_HOURS | 1<<HC595_LATCH_HOURS);// | 1<<HC595_nOE_HOURS;
+	
+	HC595_DDR_MINUTES |= 1<<HC595_DATA_MINUTES | 1<<HC595_CLOCK_MINUTES | 1<<HC595_LATCH_MINUTES;// | 1<<HC595_nOE_MINUTES;
+	HC595_PORT_MINUTES &= ~(1<<HC595_DATA_MINUTES | 1<<HC595_CLOCK_MINUTES | 1<<HC595_LATCH_MINUTES);// | 1<<HC595_nOE_MINUTES;
+	
+	HC595_DDR_SEC |= 1<<HC595_DATA_SEC | 1<<HC595_CLOCK_SEC | 1<<HC595_LATCH_SEC;// | 1<<HC595_nOE_SEC;
+	HC595_PORT_SEC &= ~(1<<HC595_DATA_SEC | 1<<HC595_CLOCK_SEC | 1<<HC595_LATCH_SEC);// | 1<<HC595_nOE_SEC;
+	
+	
 	// Init I2C
 	i2c_init();
 	
