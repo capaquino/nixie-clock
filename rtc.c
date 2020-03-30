@@ -48,7 +48,9 @@ uint8_t toMinutes(uint8_t i2c_minutes_register_read_data)
 uint8_t toHours(uint8_t i2c_hours_register_read_data)
 {
 	return (i2c_hours_register_read_data&0x0F)				// ones, mask 0b0000 1111
-		+ (((i2c_hours_register_read_data&0x10)>>4)*10);	// tens, 0b0001 0000 >> 4 * 10
+		+ (((i2c_hours_register_read_data&0x30)>>4)*10);	// tens, 0b0011 0000 >> 4 * 10  // 24 hour clock
+		
+		// historical note: // tens, 0b0001 0000 >> 4 * 10  <<< this is wrong for a 24 hour clock but works for a 12 hour clock
 }
 
 

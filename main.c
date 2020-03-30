@@ -454,8 +454,11 @@ ISR(PCINT1_vect)
 		
 		else if (~(PINC & 0x07) & 1<<PINC2) // programming mode hours/min/sec. PC2 triggered
 		{
-			programmingModeState++; // advance to next mode
-			if (programmingModeState == LAST_STATE) programmingModeState = NOT_PROGRAMMING;
+			if (nixieOutputOn == true) // only allow programming when the display is on
+			{
+				programmingModeState++; // advance to next mode
+				if (programmingModeState == LAST_STATE) programmingModeState = NOT_PROGRAMMING;	
+			}
 		}
 	}
 	
@@ -656,6 +659,12 @@ int main(void)
 				set_tube_digit(nixie, hours%10, HOURS_ONES_TUBE);
 				set_tube_digit(nixie, hours/10, HOURS_TENS_TUBE);
 				
+				// Update the minutes as well, was having trouble where hours would change minutes tubes while programming.
+				// Still not sure why. Changing minutes tube doesn't affect seconds. AND these arent even daisychained.
+				rtc_write(DS3231_MINUTES_REG_OFFSET,toRegisterValue(minutes));
+				set_tube_digit(nixie, minutes%10, MINUTES_ONES_TUBE);
+				set_tube_digit(nixie, minutes/10, MINUTES_TENS_TUBE);
+				
 				display(nixie, NUMBER_OF_TUBES);
 			}
 			else if (programmingModeState == MINUTES)
@@ -693,19 +702,19 @@ int main(void)
 		else
 		{
 			// normal operation.
-			// turn_off_display(NUMBER_OF_TUBES);
+			turn_off_display(NUMBER_OF_TUBES);
 			
 			// if counting
-			if (counter % TFACTOR == 0)
-			{
-				set_tube_digit(nixie, counter/TFACTOR, HOURS_ONES_TUBE);
-				set_tube_digit(nixie, counter/TFACTOR, HOURS_TENS_TUBE);
-				set_tube_digit(nixie, counter/TFACTOR, MINUTES_ONES_TUBE);
-				set_tube_digit(nixie, counter/TFACTOR, MINUTES_TENS_TUBE);
-				set_tube_digit(nixie, counter/TFACTOR, SECONDS_ONES_TUBE);
-				set_tube_digit(nixie, counter/TFACTOR, SECONDS_TENS_TUBE);
-			}
-			display(nixie, NUMBER_OF_TUBES);
+			//if (counter % TFACTOR == 0)
+			//{
+				//set_tube_digit(nixie, counter/TFACTOR, HOURS_ONES_TUBE);
+				//set_tube_digit(nixie, counter/TFACTOR, HOURS_TENS_TUBE);
+				//set_tube_digit(nixie, counter/TFACTOR, MINUTES_ONES_TUBE);
+				//set_tube_digit(nixie, counter/TFACTOR, MINUTES_TENS_TUBE);
+				//set_tube_digit(nixie, counter/TFACTOR, SECONDS_ONES_TUBE);
+				//set_tube_digit(nixie, counter/TFACTOR, SECONDS_TENS_TUBE);
+			//}
+			//display(nixie, NUMBER_OF_TUBES);
 		}
 	}
 }
