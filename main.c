@@ -23,21 +23,21 @@
 #define HC595_DATA_HOURS PORTD0
 #define HC595_CLOCK_HOURS PORTD1
 #define HC595_LATCH_HOURS PORTD2
-//#define HC595_nOE_HOURS	PORTD3
+#define HC595_nOE_HOURS	PORTD3
 
 #define HC595_PORT_MINUTES PORTD
 #define HC595_DDR_MINUTES DDRD
 #define HC595_DATA_MINUTES PORTD4
 #define HC595_CLOCK_MINUTES PORTD5
 #define HC595_LATCH_MINUTES PORTD6
-//#define HC595_nOE_MINUTES	PORTD3
+#define HC595_nOE_MINUTES	PORTD3
 
 #define HC595_PORT_SEC PORTB
 #define HC595_DDR_SEC DDRB
 #define HC595_DATA_SEC PORTB1
 #define HC595_CLOCK_SEC PORTB6
 #define HC595_LATCH_SEC PORTB7
-//#define HC595_nOE_SEC	PORTD3
+#define HC595_nOE_SEC	PORTD3
 
 void hc595_clock_pulse_hours(void)
 {
@@ -53,7 +53,7 @@ void hc595_latch_pulse_hours(void)
 
 void shift_bytes_msb_hours(uint8_t bytes[], unsigned int numberOfBytes)
 {
-	//HC595_PORT_HOURS |= 1<<HC595_nOE_HOURS; // turn off
+	HC595_PORT_HOURS |= 1<<HC595_nOE_HOURS; // turn off
 	
 	uint8_t data = 0;
 	
@@ -79,7 +79,7 @@ void shift_bytes_msb_hours(uint8_t bytes[], unsigned int numberOfBytes)
 	
 	hc595_latch_pulse_hours();
 	
-	//HC595_PORT_HOURS &= ~(1<<HC595_nOE_HOURS); // turn on
+	HC595_PORT_HOURS &= ~(1<<HC595_nOE_HOURS); // turn on
 }
 
 void hc595_clock_pulse_minutes(void)
@@ -96,7 +96,7 @@ void hc595_latch_pulse_minutes(void)
 
 void shift_bytes_msb_minutes(uint8_t bytes[], unsigned int numberOfBytes)
 {
-	//HC595_PORT_MINUTES |= 1<<HC595_nOE_MINUTES; // turn off
+	HC595_PORT_MINUTES |= 1<<HC595_nOE_MINUTES; // turn off
 	
 	uint8_t data = 0;
 	
@@ -122,7 +122,7 @@ void shift_bytes_msb_minutes(uint8_t bytes[], unsigned int numberOfBytes)
 	
 	hc595_latch_pulse_minutes();
 	
-	//HC595_PORT_MINUTES &= ~(1<<HC595_nOE_MINUTES); // turn on
+	HC595_PORT_MINUTES &= ~(1<<HC595_nOE_MINUTES); // turn on
 }
 
 
@@ -141,7 +141,7 @@ void hc595_latch_pulse_sec(void)
 
 void shift_bytes_msb_sec(uint8_t bytes[], unsigned int numberOfBytes)
 {
-	//HC595_PORT_SEC |= 1<<HC595_nOE_SEC; // turn off
+	HC595_PORT_SEC |= 1<<HC595_nOE_SEC; // turn off
 	
 	uint8_t data = 0;
 	
@@ -167,7 +167,7 @@ void shift_bytes_msb_sec(uint8_t bytes[], unsigned int numberOfBytes)
 	
 	hc595_latch_pulse_sec();
 	
-	//HC595_PORT_SEC &= ~(1<<HC595_nOE_SEC); // turn on
+	HC595_PORT_SEC &= ~(1<<HC595_nOE_SEC); // turn on
 }
 
 /////////////////////////////////////////////////////////////////////////
