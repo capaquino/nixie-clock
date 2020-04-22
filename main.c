@@ -25,6 +25,7 @@
 #define HC595_LATCH PORTD2
 #define HC595_nOE	PORTD3
 
+
 void hc595_clock_pulse(void)
 {
 	HC595_PORT |= 1<<HC595_CLOCK;
@@ -38,8 +39,12 @@ void hc595_latch_pulse(void)
 }
 
 void shift_bytes_msb(uint8_t bytes[], unsigned int numberOfBytes)
-{
-	HC595_PORT |= 1<<HC595_nOE; // turn off
+{	
+	
+	HC595_PORT &= ~(1<<HC595_CLOCK);
+	HC595_PORT &= ~(1<<HC595_LATCH);
+	
+	//HC595_PORT |= 1<<HC595_nOE; // turn off
 	
 	uint8_t data = 0;
 	
@@ -65,7 +70,7 @@ void shift_bytes_msb(uint8_t bytes[], unsigned int numberOfBytes)
 	
 	hc595_latch_pulse();
 	
-	HC595_PORT &= ~(1<<HC595_nOE); // turn on
+	//HC595_PORT &= ~(1<<HC595_nOE); // turn on
 }
 
 void shift_byte_msb(uint8_t data)
@@ -302,8 +307,11 @@ ISR(PCINT1_vect)
 		
 		else if (~(PINC & 0x07) & 1<<PINC2) // programming mode hours/min/sec. PC2 triggered
 		{
-			programmingModeState++; // advance to next mode
-			if (programmingModeState == LAST_STATE) programmingModeState = NOT_PROGRAMMING;
+			if (nixieOutputOn == true)
+			{
+				programmingModeState++; // advance to next mode
+				if (programmingModeState == LAST_STATE) programmingModeState = NOT_PROGRAMMING;
+			}		
 		}
 	}
 	
@@ -351,15 +359,15 @@ ISR(PCINT0_vect)
 	//updateFlag = true;	
 //}
 
-#define TFACTOR 20
-volatile unsigned int counter = 0;
-
-ISR(TIMER0_OVF_vect)
-{
-	counter++;
-	
-	if (counter == 10*TFACTOR) counter = 0;
-}
+//#define TFACTOR 20
+//volatile unsigned int counter = 0;
+//
+//ISR(TIMER0_OVF_vect)
+//{
+	//counter++;
+	//
+	//if (counter == 10*TFACTOR) counter = 0;
+//}
 
 #pragma endregion Interrupts
 
@@ -448,9 +456,9 @@ int main(void)
 	PCIFR |= 0x02;
 	
 	// Timer interrupt
-	TCCR0A = 0x00;
-	TCCR0B = 0x05; // prescaler 1024
-	TIMSK0 = 1<<TOIE0;
+	//TCCR0A = 0x00;
+	//TCCR0B = 0x05; // prescaler 1024
+	//TIMSK0 = 1<<TOIE0;
 	
 
 	sei(); // enable interrupts
@@ -473,15 +481,15 @@ int main(void)
 				seconds = toSeconds(rtc_data_sec);
 			
 				/* Organize into nixie tube data. */
-									
+				
 				// Hours
 				set_tube_digit(nixie, hours%10, HOURS_ONES_TUBE);
 				set_tube_digit(nixie, hours/10, HOURS_TENS_TUBE);
-									
+					
 				// Minutes
 				set_tube_digit(nixie, minutes%10, MINUTES_ONES_TUBE);
 				set_tube_digit(nixie, minutes/10, MINUTES_TENS_TUBE);
-									
+					
 				// Seconds
 				set_tube_digit(nixie, seconds%10, SECONDS_ONES_TUBE);
 				set_tube_digit(nixie, seconds/10, SECONDS_TENS_TUBE);
@@ -495,6 +503,11 @@ int main(void)
 				rtc_write(DS3231_HOURS_REG_OFFSET,toRegisterValue(hours));
 				set_tube_digit(nixie, hours%10, HOURS_ONES_TUBE);
 				set_tube_digit(nixie, hours/10, HOURS_TENS_TUBE);
+				
+				// Fix hours programming affecting minutes tubes (temporary, maybe permanent)
+				rtc_write(DS3231_MINUTES_REG_OFFSET,toRegisterValue(minutes));
+				set_tube_digit(nixie, minutes%10, MINUTES_ONES_TUBE);
+				set_tube_digit(nixie, minutes/10, MINUTES_TENS_TUBE);
 				
 				display(nixie, NUMBER_OF_TUBES);
 			}
@@ -533,19 +546,19 @@ int main(void)
 		else
 		{
 			// normal operation.
-			// turn_off_display(NUMBER_OF_TUBES);
+			turn_off_display(NUMBER_OF_TUBES);
 			
 			// if counting
-			if (counter % TFACTOR == 0)
-			{
-				set_tube_digit(nixie, counter/TFACTOR, HOURS_ONES_TUBE);
-				set_tube_digit(nixie, counter/TFACTOR, HOURS_TENS_TUBE);
-				set_tube_digit(nixie, counter/TFACTOR, MINUTES_ONES_TUBE);
-				set_tube_digit(nixie, counter/TFACTOR, MINUTES_TENS_TUBE);
-				set_tube_digit(nixie, counter/TFACTOR, SECONDS_ONES_TUBE);
-				set_tube_digit(nixie, counter/TFACTOR, SECONDS_TENS_TUBE);
-			}
-			display(nixie, NUMBER_OF_TUBES);
+			//if (counter % TFACTOR == 0)
+			//{
+				//set_tube_digit(nixie, counter/TFACTOR, HOURS_ONES_TUBE);
+				//set_tube_digit(nixie, counter/TFACTOR, HOURS_TENS_TUBE);
+				//set_tube_digit(nixie, counter/TFACTOR, MINUTES_ONES_TUBE);
+				//set_tube_digit(nixie, counter/TFACTOR, MINUTES_TENS_TUBE);
+				//set_tube_digit(nixie, counter/TFACTOR, SECONDS_ONES_TUBE);
+				//set_tube_digit(nixie, counter/TFACTOR, SECONDS_TENS_TUBE);
+			//}
+			//display(nixie, NUMBER_OF_TUBES);
 		}
 	}
 }
