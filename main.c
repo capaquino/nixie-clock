@@ -141,6 +141,33 @@ void display(uint8_t bytes[], unsigned int numberOfBytes)
 		squishedBytesSize = (numberOfBytes+1)/2;
 	}
 	
+	// --PCB fix--
+	// FIX FOR PCB SWITCHED POSITIONS ISSUE
+	//
+	// note have not fully verified that this fix
+	// works with odd number of nixie tubes but i think the numberOfBytes-1 handles the end digit case.
+	//
+	// If you have 5 digits, elements are 0 1 2 (3) 4 , () denotes where algorithm will last execute. This algorithm
+	// does nothing on odd digits so it will execute on elements 0 and 2 and the progression will look like...
+	//
+	// start:	0     1 2     3 4
+	// swap:	0 <-> 1 2 <-> 3 4
+	// result:  1 0 3 2 4
+	//
+	// it also works for evens too for sure. Try the above with 6 elements.
+	for (unsigned int i = 0; i < numberOfBytes-1; i++)
+	{
+		// swap every even with the odd in front of it
+		if (i%2 == 0) // even
+		{
+			uint8_t bytes_i_temp = bytes[i];	// save the even
+			
+			// swap even with odd element in front of it
+			bytes[i] = bytes[i+1];
+			bytes[i+1] = bytes_i_temp;
+		}
+	}
+	
 	// squish the array into half of its size since 1 74HC595 controls 2 K155ID1
 	for (unsigned int i = 0; i < numberOfBytes; i++)
 	{
@@ -505,6 +532,11 @@ int main(void)
 				set_tube_digit(nixie, minutes%10, MINUTES_ONES_TUBE);
 				set_tube_digit(nixie, minutes/10, MINUTES_TENS_TUBE);
 				
+				// --PCB fix-- Fix hours programming affecting seconds tubes (temporary, maybe permanent)
+				rtc_write(DS3231_SECONDS_REG_OFFSET,toRegisterValue(seconds));
+				set_tube_digit(nixie, seconds%10, SECONDS_ONES_TUBE);
+				set_tube_digit(nixie, seconds/10, SECONDS_TENS_TUBE);
+				
 				display(nixie, NUMBER_OF_TUBES);
 			}
 			else if (programmingModeState == MINUTES)
@@ -517,6 +549,11 @@ int main(void)
 				rtc_write(DS3231_HOURS_REG_OFFSET,toRegisterValue(hours));
 				set_tube_digit(nixie, hours%10, HOURS_ONES_TUBE);
 				set_tube_digit(nixie, hours/10, HOURS_TENS_TUBE);
+				
+				// --PCB fix-- programming affecting seconds tubes (temporary, maybe permanent)
+				rtc_write(DS3231_SECONDS_REG_OFFSET,toRegisterValue(seconds));
+				set_tube_digit(nixie, seconds%10, SECONDS_ONES_TUBE);
+				set_tube_digit(nixie, seconds/10, SECONDS_TENS_TUBE);
 				
 				display(nixie, NUMBER_OF_TUBES);
 			}
