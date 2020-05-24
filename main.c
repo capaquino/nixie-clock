@@ -449,10 +449,11 @@ int main(void)
 	i2c_init();
 	
 	// Init DS3231
-	rtc_write(DS3231_CONTROL_REG_OFFSET,0x00);
-	rtc_write(DS3231_HOURS_REG_OFFSET,toRegisterValue(10));
-	rtc_write(DS3231_MINUTES_REG_OFFSET,toRegisterValue(59));
-	rtc_write(DS3231_SECONDS_REG_OFFSET,toRegisterValue(45));
+	// Uncomment this to program the DS3231 with a known time (10:59:45)
+	//rtc_write(DS3231_CONTROL_REG_OFFSET,0x00);
+	//rtc_write(DS3231_HOURS_REG_OFFSET,toRegisterValue(10));
+	//rtc_write(DS3231_MINUTES_REG_OFFSET,toRegisterValue(59));
+	//rtc_write(DS3231_SECONDS_REG_OFFSET,toRegisterValue(45));
 	uint8_t rtc_data_sec = 0;
 	uint8_t rtc_data_min = 0;
 	uint8_t rtc_data_hour = 0;
